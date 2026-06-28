@@ -1,5 +1,6 @@
 import os
 import csv
+import asyncio
 import threading
 from flask import Flask
 from dotenv import load_dotenv
@@ -46,7 +47,6 @@ async def price_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await menu_cmd(update, context)
 
-# Flask в отдельном потоке
 app_flask = Flask(__name__)
 
 @app_flask.route('/')
@@ -57,11 +57,7 @@ def run_flask():
     port = int(os.environ.get('PORT', 10000))
     app_flask.run(host='0.0.0.0', port=port)
 
-if __name__ == "__main__":
-    # 1. Запускаем Flask в фоне чтобы Render не убил сервис
-    threading.Thread(target=run_flask, daemon=True).start()
-    
-    # 2. Запускаем бота в главном потоке
+async def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", menu_cmd))
@@ -70,4 +66,8 @@ if __name__ == "__main__":
         price_handler
     ))
     print("Bot started")
-    app.run_polling()
+    await app.run_polling()
+
+if __name__ == "__main__":
+    threading.Thread(target=run_flask, daemon=True).start()
+    asyncio.run(main())
