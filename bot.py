@@ -1,49 +1,76 @@
+import os
+import csv
+import threading
+from flask import Flask
+from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-import pandas as pd
 
-TOKEN = "8946010669:AAFSfmDf4vsxRElvmYc3R9ckZ08x9uiVJp4"
+load_dotenv()
+TOKEN = os.getenv("BOT_TOKEN")  # на Render переменная должна называться BOT_TOKEN
 
-# Грузим меню 1 раз при старте
-df = pd.read_csv('menu.csv')
+# Грузим меню 1 раз при старте в список словарей
+def load_menu():
+    menu = []
+    with open('menu.csv', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            menu.append(row)
+    return menu
 
-def df_to_text(dataframe):
-    """Превращаем DataFrame в красивый текст для Telegram"""
+MENU = load_menu()
+
+def menu_to_text(items):
+    """Превращаем список позиций в красивый текст"""
+    if not items:
+        return "Ничего не найдено"
     lines = ["Меню:"]
-    for _, row in dataframe.iterrows():
-        lines.append(f"{row['item']} - {row['price']}")
+    for item in items:
+        lines.append(f"{item['item']} - {item['price']}")
     return "\n".join(lines)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет! Я бот кофейни. Напиши /menu")
 
-async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = df_to_text(df)
+async def menu_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = menu_to_text(MENU)
     await update.message.reply_text(text)
 
 async def price_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text.lower()
     
-    # Ищем какой напиток упомянул пользователь
+    # Ищем какие напитки упомянул пользователь
     found_items = []
-    for item_name in df['item']:
-        if item_name.lower() in user_text:
-            found_items.append(item_name)
+    for item in MENU:
+        if item['item'].lower() in user_text:
+            found_items.append(item)
     
     if found_items:
-        # Нашли конкретные напитки - показываем только их
-        filtered = df[df['item'].isin(found_items)]
-        await update.message.reply_text(df_to_text(filtered))
+        await update.message.reply_text(menu_to_text(found_items))
     else:
-        # Просто спросили "цена" без уточнения - кидаем всё меню
-        await menu(update, context)
+        await menu_cmd(update, context)
 
-app = Application.builder().token(TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("menu", menu))
-app.add_handler(MessageHandler(
-    filters.TEXT & filters.Regex(r'(?i)(цена|сколько стоит|прайс|цены)'), 
-    price_handler
-))
+def run_bot():
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("menu", menu_cmd))
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex(r'(?i)(цена|сколько стоит|прайс|цены)'), 
+        price_handler
+    ))
+    app.run_polling()
+
+# Фиктивный веб-сервер для Render чтобы не засыпал
+app_flask = Flask(__name__)
+
+@app_flask.route('/')
+def home():
+    return "Bot is alive!"
+
+if __name__ == "__main__":
+    # Запускаем бота в отдельном потоке
+    threading.Thread(target=run_bot).start()
+    # Запускаем Flask на порту который даст Render
+    app_flask.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
 
 app.run_polling()
