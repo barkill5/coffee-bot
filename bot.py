@@ -57,7 +57,12 @@ def run_flask():
     port = int(os.environ.get('PORT', 10000))
     app_flask.run(host='0.0.0.0', port=port)
 
-async def main():
+if __name__ == "__main__":
+    # 1. Flask обязательно в daemon потоке
+    threading.Thread(target=run_flask, daemon=True).start()
+    
+    # 2. Бот в главном потоке. Эта строка должна быть последней
+    print("Starting bot...")
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", menu_cmd))
@@ -65,9 +70,4 @@ async def main():
         filters.TEXT & filters.Regex(r'(?i)(цена|сколько стоит|прайс|цены)'), 
         price_handler
     ))
-    print("Bot started")
-    await app.run_polling()
-
-if __name__ == "__main__":
-    threading.Thread(target=run_flask, daemon=True).start()
-    asyncio.run(main())
+    app.run_polling()  # эта строка блокирует поток и запускает бота 
