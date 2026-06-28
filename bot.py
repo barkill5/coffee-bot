@@ -1,6 +1,5 @@
 import os
 import csv
-import asyncio
 import threading
 from flask import Flask
 from dotenv import load_dotenv
@@ -8,9 +7,8 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 load_dotenv()
-TOKEN = os.getenv("BOT_TOKEN")  # на Render переменная должна называться BOT_TOKEN
+TOKEN = os.getenv("BOT_TOKEN")
 
-# Грузим меню 1 раз при старте в список словарей
 def load_menu():
     menu = []
     with open('menu.csv', encoding='utf-8') as f:
@@ -22,7 +20,6 @@ def load_menu():
 MENU = load_menu()
 
 def menu_to_text(items):
-    """Превращаем список позиций в красивый текст"""
     if not items:
         return "Ничего не найдено"
     lines = ["Меню:"]
@@ -39,8 +36,6 @@ async def menu_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def price_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text.lower()
-    
-    # Ищем какие напитки упомянул пользователь
     found_items = []
     for item in MENU:
         if item['item'].lower() in user_text:
@@ -51,10 +46,22 @@ async def price_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await menu_cmd(update, context)
 
-def run_bot():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+# Flask в отдельном потоке
+app_flask = Flask(__name__)
+
+@app_flask.route('/')
+def home():
+    return "Bot is alive!"
+
+def run_flask():
+    port = int(os.environ.get('PORT', 10000))
+    app_flask.run(host='0.0.0.0', port=port)
+
+if __name__ == "__main__":
+    # 1. Запускаем Flask в фоне чтобы Render не убил сервис
+    threading.Thread(target=run_flask, daemon=True).start()
     
+    # 2. Запускаем бота в главном потоке
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", menu_cmd))
@@ -62,19 +69,5 @@ def run_bot():
         filters.TEXT & filters.Regex(r'(?i)(цена|сколько стоит|прайс|цены)'), 
         price_handler
     ))
-    loop.run_until_complete(app.run_polling())
-
-# Фиктивный веб-сервер для Render чтобы не засыпал
-app_flask = Flask(__name__)
-
-@app_flask.route('/')
-def home():
-    return "Bot is alive!"
-
-if __name__ == "__main__":
-    # Запускаем бота в отдельном потоке
-    threading.Thread(target=run_bot).start()
-    # Запускаем Flask на порту который даст Render
-    app_flask.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
-
-app.run_polling()
+    print("Bot started")
+    app.run_polling()
