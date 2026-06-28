@@ -58,18 +58,20 @@ def run_flask():
     app_flask.run(host='0.0.0.0', port=port)
 
 async def run_bot():
+    print("1. Создаю Application...")
     app = Application.builder().token(TOKEN).build()
+    print("2. Добавляю хендлеры...")
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", menu_cmd))
     app.add_handler(MessageHandler(
         filters.TEXT & filters.Regex(r'(?i)(цена|сколько стоит|прайс|цены)'), 
         price_handler
     ))
-    print("Starting bot...")
+    print("3. Starting bot...")
     await app.initialize()
     await app.start()
     await app.updater.start_polling()
-    # Блокируем чтобы бот не умер
+    print("4. Bot is polling!")
     await asyncio.Event().wait()
 
 if __name__ == "__main__":
