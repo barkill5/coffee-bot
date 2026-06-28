@@ -1,5 +1,6 @@
 import os
 import csv
+import asyncio
 import threading
 from flask import Flask
 from dotenv import load_dotenv
@@ -51,6 +52,9 @@ async def price_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await menu_cmd(update, context)
 
 def run_bot():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", menu_cmd))
@@ -58,7 +62,7 @@ def run_bot():
         filters.TEXT & filters.Regex(r'(?i)(цена|сколько стоит|прайс|цены)'), 
         price_handler
     ))
-    app.run_polling()
+    loop.run_until_complete(app.run_polling())
 
 # Фиктивный веб-сервер для Render чтобы не засыпал
 app_flask = Flask(__name__)
