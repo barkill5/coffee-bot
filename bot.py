@@ -2,6 +2,8 @@ import os
 import csv
 import asyncio
 import threading
+import logging
+logging.basicConfig(level=logging.INFO)
 from flask import Flask
 from dotenv import load_dotenv
 from telegram import Update
@@ -9,6 +11,8 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
+if not TOKEN:
+    raise ValueError("BOT_TOKEN не найден! Добавь его в Environment на Render")
 
 def load_menu():
     menu = []
